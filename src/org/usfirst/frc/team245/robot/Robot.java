@@ -1,6 +1,17 @@
 package org.usfirst.frc.team245.robot;
 
 import com.github.adambots.steamworks2017.auton.SendableChooserValue;
+
+import java.awt.List;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+
 import com.github.adambots.steamworks2017.auton.GeneratedMotionProfile;
 import com.github.adambots.steamworks2017.climb.Climb;
 import com.github.adambots.steamworks2017.drive.Drive;
@@ -39,7 +50,10 @@ public class Robot extends IterativeRobot {
 	 */
 	private String state;
 	private String lastState;
-
+	private long startTime;
+	private double[][] arrayContainer = new double[3][750];
+	private double[] myIntArray = new double [3];
+	private int index;
 	public void robotInit() {
 
 		autoChooser = new SendableChooser<SendableChooserValue>();
@@ -241,8 +255,105 @@ public class Robot extends IterativeRobot {
 		SmartDashboard.putString("Stream", NetworkTables.getControlsTable().getString("stream", "nothing"));
 		SmartDashboard.putNumber("Auton number:", autonomousNumber);
 		SmartDashboard.putNumber("Backup number:", backupNumber);
+		double triggerValue= Gamepad.primary.getTriggers();
+		double joystickValue= Gamepad.primary.getLeftX();
+		long timeStamp= startTime - System.nanoTime();
+		double[] myIntArray = {triggerValue,joystickValue,(double)timeStamp};
+		arrayContainer[index] = myIntArray;
+		index++;
 	}
+	public void teleopInit() {
+		if (state.equals("teleop")) {
+			lastState = "teleop";
+		}
+		state = "teleop";
 
+		if (lastState.equals("auton")) {
+			NetworkTables.getControlsTable().putBoolean("auton", false);
+		}
+
+		NetworkTables.putStream(Gamepad.primary.getX() || Gamepad.secondary.getX());
+		/*
+		 * Primary Controllers Controls
+		 */
+		// TODO: confirm right trigger forward, left trigger reverse
+		// Drive controls
+		Drive.drive(-Gamepad.primary.getLeftX(), Gamepad.primary.getTriggers()); 
+		Drive.shift(Gamepad.primary.getA(), Gamepad.primary.getY()); // shifting with A low gear and Y high gear
+		Drive.shiftToggle(Gamepad.primary.getLB());
+
+		// Climb controls
+		Climb.climbStopPrimary(Gamepad.primary.getDPadLeft()); // runs climbStop using left on the DPad - Primary
+		// Climb.climbSafetyTogglePrimary(Gamepad.primary.getBack()); //toggles safety if pressed 3 times
+
+		// Gear controls
+		Score.dispenseGear(Gamepad.primary.getB() || Gamepad.secondary.getDPadUp());
+
+		/*
+		 * Secondary Controllers Controls
+		 */
+		// Intake controls
+		Intake.intake(Gamepad.secondary.getRightButton()); // runs intake with clicking in the Right Joystick on second controller
+		Intake.intakeSpeed(Gamepad.secondary.getRightY()); // Override Y Button
+		Intake.intakeDirection(Gamepad.secondary.getRightX()); // Override Y Button
+		Intake.intakeJam(Gamepad.secondary.getLB()); // Runs the unjamming procedure for a max of 3 seconds per press
+		// Intake.intakeSafety(Gamepad.secondary.getStart()); //Have to press 3 times to toggle the safety
+		Intake.intakeIn(Gamepad.secondary.getA()); // Toggles Intake running into the robot at full speed
+		Intake.intakeRun(Gamepad.secondary.getRB()); // Runs all stuff for intake in(conveyor and intake motor)
+		Intake.intakeOut(Gamepad.secondary.getB());
+		// Climb controls
+		Climb.climbStopSecondary(Gamepad.secondary.getDPadRight()); // runs climbStop using left on the DPad - Secondary
+		Climb.climbStartSecondary(Gamepad.secondary.getDPadLeft()); // runs climbStart using right on the DPad Secondary
+		Climb.climbSafetyToggleSecondary(Gamepad.secondary.getBack()); // Have to press 3 times to toggle the safety
+
+		// Gear controls
+		// Score.gearLock(Gamepad.secondary.getStart(),
+		// Gamepad.secondary.getBack());
+		// Outtake Controls
+		// Score.outtakeToggle(Gamepad.secondary.getLB());
+
+		// Conveyor Controls
+
+		Score.conveyor(Gamepad.secondary.getLeftButton()); // runs conveyor with clicking in the Left Joystick on second controller
+		Score.conveyorSpeed(Gamepad.secondary.getLeftY());
+		Score.conveyorDirection(Gamepad.secondary.getLeftX());
+		Score.conveyorIn(Gamepad.secondary.getY());
+
+		// Sweeper
+		// Sweeper.sweeperMotion(Gamepad.secondary.getTriggers());
+
+		Dash.driveMode();
+
+		SmartDashboard.putString("Controls Table", NetworkTables.getControlsTable().getKeys().toString());
+		SmartDashboard.putString("Stream", NetworkTables.getControlsTable().getString("stream", "nothing"));
+		SmartDashboard.putNumber("Auton number:", autonomousNumber);
+		SmartDashboard.putNumber("Backup number:", backupNumber);
+		startTime = System.nanoTime();
+		
+	}
+	public void disabledInit(){
+		try{
+			PrintWriter writer = new PrintWriter("autonGhost.txt", "UTF-8");	
+			double triggerValue;
+			double joystickValue;
+			long timeStamp;
+			for (index = 0;index < 750; index++){
+				writer.print(index);
+				for(int i = 0; i<3; i++){
+					writer.print(" ");
+					writer.print(arrayContainer[index][i]);
+				}
+			writer.println();
+			}
+			
+			writer.println(arrayContainer);
+			writer.close();
+		    	
+		}
+		catch (IOException e) {
+		  
+		}
+	 }
 	/**
 	 * This function is called periodically during test mode
 	 */
